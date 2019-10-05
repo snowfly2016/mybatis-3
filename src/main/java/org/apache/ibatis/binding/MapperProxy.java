@@ -74,12 +74,23 @@ public class MapperProxy<T> implements InvocationHandler, Serializable {
     lookupConstructor = lookup;
   }
 
+  /**
+   * 调用mapper接口中方法是的入口，Proxy会调用invocationHandler的invoke方法
+   * @param proxy JAVA反射的动态代理对象，getMapper()中通过JAVA反射Proxy.newProxyInstance()生成的动态代理
+   * @param method 要调用的接口方法
+   * @param args 方法入参
+   * @return
+   * @throws Throwable
+   */
   @Override
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
     try {
+      /*mapper接口类中的抽象方法不会执行这里的if 和else*/
       if (Object.class.equals(method.getDeclaringClass())) {
+        /*mapper是一个接口，而非实现类，不会走到这个地方*/
         return method.invoke(this, args);
       } else if (method.isDefault()) {
+        /*mapper中方法为抽象方法，也不会走到这儿*/
         if (privateLookupInMethod == null) {
           return invokeDefaultMethodJava8(proxy, method, args);
         } else {
@@ -89,11 +100,21 @@ public class MapperProxy<T> implements InvocationHandler, Serializable {
     } catch (Throwable t) {
       throw ExceptionUtil.unwrapThrowable(t);
     }
+    /*生成mapperMethod，先从cache中取，如果没有则创建一个MapperMethod*/
     final MapperMethod mapperMethod = cachedMapperMethod(method);
+    /*执行execute，通过mapperMethod的method方法名，从xml中找到匹配的SQL语句，最终利用SQLSession执行数据库操作*/
     return mapperMethod.execute(sqlSession, args);
   }
 
+  /*生成MapperMethod，先从cache中取，如果没有则创建一个MapperMethod*/
   private MapperMethod cachedMapperMethod(Method method) {
+    /**
+     * 先从cache中取，未命中，则创建一个MapperMethod
+     * 创建MapperMethod用来执行mapper接口的方法
+     * mapperInterface 用户定义的mapper接口类
+     * method 要执行的的mapper接口中的方法
+     * Configuration xml配置信息
+     */
     return methodCache.computeIfAbsent(method,
         k -> new MapperMethod(mapperInterface, method, sqlSession.getConfiguration()));
   }

@@ -129,43 +129,84 @@ public abstract class BaseExecutor implements Executor {
     return doFlushStatements(isRollBack);
   }
 
+  /**
+   * BaseExecutor的查找方法
+   * @param ms
+   * @param parameter
+   * @param rowBounds
+   * @param resultHandler
+   * @param <E>
+   * @return
+   * @throws SQLException
+   */
   @Override
   public <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler) throws SQLException {
+    /*从mapperStatement中找到boundSql成员变量，前面SqlSessionFactory创建部分讲到过Mapper解析时的三大组件 MapperStatement SQLSource BoundSql*/
+    /*其中BoundSql通过sql执行语句和入参，来组装最终查询数据库用到的sql*/
     BoundSql boundSql = ms.getBoundSql(parameter);
+    /*创建cachekey，用过缓存的key*/
+    /*sql的id，逻辑分页rowBounds的offset、limit，boundSql的sql语句均相同时<主要是动态sql的存在>，也就是组装后的sql语句完全相同时，才认为是同一个cachekey*/
     CacheKey key = createCacheKey(ms, parameter, rowBounds, boundSql);
+    //真正的查询语句执行处
     return query(ms, parameter, rowBounds, resultHandler, key, boundSql);
   }
 
+  /**
+   * 查找方法
+   * @param ms
+   * @param parameter
+   * @param rowBounds
+   * @param resultHandler
+   * @param key
+   * @param boundSql
+   * @param <E>
+   * @return
+   * @throws SQLException
+   */
   @SuppressWarnings("unchecked")
   @Override
   public <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler, CacheKey key, BoundSql boundSql) throws SQLException {
     ErrorContext.instance().resource(ms.getResource()).activity("executing a query").object(ms.getId());
+    //调度器已经close了则报错
     if (closed) {
       throw new ExecutorException("Executor was closed.");
     }
+    /**
+     * flush cache 即写入并清空cache。之后就只能从数据库中读取了，这样可以防止脏cache
+     * localCache和localOutputParameterCache为BaseExecutor的成员变量，
+     * 他们构建了mybatis的一级缓存，也就是sqlSession级别的缓存，默认是开启的。
+     */
     if (queryStack == 0 && ms.isFlushCacheRequired()) {
       clearLocalCache();
     }
+    //从缓存或数据库中查询结果list
     List<E> list;
     try {
+      //queryStack用来记录当前有几条同样的查询语句在同时执行，也就是并发
       queryStack++;
+      //未定义resultHandler时，先尝试从缓存中取
       list = resultHandler == null ? (List<E>) localCache.getObject(key) : null;
       if (list != null) {
+        //缓存命中是，直接从本地缓存中取出即可
         handleLocallyCachedOutputParameters(ms, key, parameter, boundSql);
       } else {
+        //缓存未命中，必须从数据库中查询
         list = queryFromDatabase(ms, parameter, rowBounds, resultHandler, key, boundSql);
       }
     } finally {
       queryStack--;
     }
+    //当前所有的查询语句都结束时，开始处理延迟加载。从缓存中取出执行结果，因为前面已经有过查询语句了
     if (queryStack == 0) {
       for (DeferredLoad deferredLoad : deferredLoads) {
+        //延迟加载从缓存中获取结果
         deferredLoad.load();
       }
       // issue #601
       deferredLoads.clear();
       if (configuration.getLocalCacheScope() == LocalCacheScope.STATEMENT) {
         // issue #482
+        //Statement级别的缓存，只缓存id相同的sql，当所有查询语句和延迟加载的查询语句均执行完毕后，可清空cache，这样可以节约内存
         clearLocalCache();
       }
     }
@@ -317,14 +358,30 @@ public abstract class BaseExecutor implements Executor {
     }
   }
 
+  /**
+   * 直接从数据库中查询
+   * @param ms
+   * @param parameter
+   * @param rowBounds
+   * @param resultHandler
+   * @param key
+   * @param boundSql
+   * @param <E>
+   * @return
+   * @throws SQLException
+   */
   private <E> List<E> queryFromDatabase(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler, CacheKey key, BoundSql boundSql) throws SQLException {
     List<E> list;
+    //先利用占位符将本次查询设置到本地cache中，个人理解是防止后面延迟加载时cache为空
     localCache.putObject(key, EXECUTION_PLACEHOLDER);
     try {
+      //查询数据库 real
       list = doQuery(ms, parameter, rowBounds, resultHandler, boundSql);
     } finally {
+      //查询到结果后，将前面的占位符的cache删掉
       localCache.removeObject(key);
     }
+    //将查询结果放到本地cache中缓存起来
     localCache.putObject(key, list);
     if (ms.getStatementType() == StatementType.CALLABLE) {
       localOutputParameterCache.putObject(key, parameter);
@@ -332,6 +389,14 @@ public abstract class BaseExecutor implements Executor {
     return list;
   }
 
+  /**
+   * 先开启数据库连接connection，直接获取数据源DataSource的connection，即通过数据库本身来开启连接
+   * jdbcTransaction和ManagedTransaction都是直接调用DataSource的getConnection
+   *
+   * @param statementLog
+   * @return
+   * @throws SQLException
+   */
   protected Connection getConnection(Log statementLog) throws SQLException {
     Connection connection = transaction.getConnection();
     if (statementLog.isDebugEnabled()) {

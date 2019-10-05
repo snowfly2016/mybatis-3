@@ -123,18 +123,27 @@ public class MapperAnnotationBuilder {
     this.type = type;
   }
 
+  /**
+   * 遍历mapper接口类的每个方法，解析其注解，生成MapperStatement，SQLSource和BoundSql三大主要对象
+   */
   public void parse() {
+    //type为mapper接口类
     String resource = type.toString();
     if (!configuration.isResourceLoaded(resource)) {
+      //根据mapper接口类名，获取xml资源文件并加载，Spring-mybatis会使用到，仅使用mybatis时不会使用到
       loadXmlResource();
       configuration.addLoadedResource(resource);
       assistant.setCurrentNamespace(type.getName());
+      //解析CacheNamespace注解，Mapper接口类注解
       parseCache();
+      /*解析CacheNamespaceRef注解，Mapper接口类注解*/
       parseCacheRef();
       Method[] methods = type.getMethods();
+      /*遍历mapper接口各个方法，然后解析方法上的注解*/
       for (Method method : methods) {
         try {
           // issue #237
+          /*解析mapper*/
           if (!method.isBridge()) {
             parseStatement(method);
           }
@@ -297,8 +306,18 @@ public class MapperAnnotationBuilder {
   }
 
   void parseStatement(Method method) {
+    //反射获取入参类型和@Lang注解，为构建sqlSource准备
     Class<?> parameterTypeClass = getParameterType(method);
     LanguageDriver languageDriver = getLanguageDriver(method);
+    /**
+     * 这一步十分关键，是创建sqlSource和其内的BoundSql对象的关键所在
+     * sqlSource是MapperStatement的一个属性，并用来提供BoundSql对象
+     * BoundSql用来建立sql语句，它包含了sql String，入参parameterObject和入参映射parameterMappings。
+     * 他利用sql语句和入参，组装成最终的访问数据库的sql语句，包括动态sql，这是mybatis mapper映射的最核心的地方
+     * 获取@Select @Insert @Update @Delete等注解，或者@SelectProvider @InsertProvider @UpdateProvider @DeleteProvider等注解
+     * 然后解析这些注解，利用注解的value，也就是sql String解析生成的sqlSource对象
+     *
+     */
     SqlSource sqlSource = getSqlSourceFromAnnotations(method, parameterTypeClass, languageDriver);
     if (sqlSource != null) {
       Options options = method.getAnnotation(Options.class);
@@ -465,18 +484,32 @@ public class MapperAnnotationBuilder {
     return returnType;
   }
 
+  /**
+   * 根据mapper的方法上的注解，解析得到sqlSource对象
+   * @param method
+   * @param parameterType
+   * @param languageDriver
+   * @return
+   */
   private SqlSource getSqlSourceFromAnnotations(Method method, Class<?> parameterType, LanguageDriver languageDriver) {
     try {
+      /*解析获取@Select @Insert @Update @Delete四者中的一个*/
       Class<? extends Annotation> sqlAnnotationType = getSqlAnnotationType(method);
+      /*解析获取@SelectProvider @InsertProvider @UpdateProvider @DeleteProvider四者中的一个*/
       Class<? extends Annotation> sqlProviderAnnotationType = getSqlProviderAnnotationType(method);
       if (sqlAnnotationType != null) {
         if (sqlProviderAnnotationType != null) {
+          //静态sql注解和sqlProvider注解不可能同时存在
           throw new BindingException("You cannot supply both a static SQL and SqlProvider to method named " + method.getName());
         }
+        //反射获取静态sql注解
         Annotation sqlAnnotation = method.getAnnotation(sqlAnnotationType);
+        /*获取注解中的value 也就是sql String*/
         final String[] strings = (String[]) sqlAnnotation.getClass().getMethod("value").invoke(sqlAnnotation);
+        /*利用sql String 和入参来组装sqlSource对象，由这两者就可以生成最终访问数据库的sql语句了*/
         return buildSqlSourceFromStrings(strings, parameterType, languageDriver);
       } else if (sqlProviderAnnotationType != null) {
+        /*反射获取sqlProvider注解，构建ProviderSQLSource类型的sqlSource*/
         Annotation sqlProviderAnnotation = method.getAnnotation(sqlProviderAnnotationType);
         return new ProviderSqlSource(assistant.getConfiguration(), sqlProviderAnnotation, type, method);
       }
@@ -486,12 +519,21 @@ public class MapperAnnotationBuilder {
     }
   }
 
+  /**
+   * 利用sql String 和入参来组装sqlSource对象，由着两者就可以生成最终访问数据库的sql语句了
+   * @param strings
+   * @param parameterTypeClass
+   * @param languageDriver
+   * @return
+   */
   private SqlSource buildSqlSourceFromStrings(String[] strings, Class<?> parameterTypeClass, LanguageDriver languageDriver) {
     final StringBuilder sql = new StringBuilder();
+    /*将sql String拼装起来，构成一整个sql 此时sql中还没有注入入参*/
     for (String fragment : strings) {
       sql.append(fragment);
       sql.append(" ");
     }
+    //构建sqlSource 由具体的languageDriver实现类完成，如xmllanguageDriver
     return languageDriver.createSqlSource(configuration, sql.toString().trim(), parameterTypeClass);
   }
 

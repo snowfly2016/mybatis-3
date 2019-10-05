@@ -43,11 +43,14 @@ public class MapperProxyFactory<T> {
   }
 
   @SuppressWarnings("unchecked")
+  /*动态代理方式，反射生成mapper接口对象*/
   protected T newInstance(MapperProxy<T> mapperProxy) {
     return (T) Proxy.newProxyInstance(mapperInterface.getClassLoader(), new Class[] { mapperInterface }, mapperProxy);
   }
 
+  /*创建mapper动态代理对象*/
   public T newInstance(SqlSession sqlSession) {
+    /*构造mapperProxy对象，然后创建我们定义的mapper接口对应的对象*/
     final MapperProxy<T> mapperProxy = new MapperProxy<>(sqlSession, mapperInterface, methodCache);
     return newInstance(mapperProxy);
   }

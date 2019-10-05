@@ -68,10 +68,15 @@ public class SimpleStatementHandler extends BaseStatementHandler {
     statement.addBatch(sql);
   }
 
+  /*SimpleStatementHandler的query查询过程*/
   @Override
   public <E> List<E> query(Statement statement, ResultHandler resultHandler) throws SQLException {
+    /*获取存放boundSql中的sql执行语句*/
     String sql = boundSql.getSql();
+    /*通过jdbc sql的statement 直接执行sql语句，入参在statement预编译时进行转换并设置到statement中了*/
     statement.execute(sql);
+    /*resultSetHandler处理查询结果并返回，这一步骤很复杂，但也体现了mybatis的设计精巧之处，可以兼容很多复杂场景下数据库结果转换。
+    * 如数据库列名和JAVA pojo属性名不同时的映射，关联数据库的映射等*/
     return resultSetHandler.handleResultSets(statement);
   }
 
@@ -91,6 +96,7 @@ public class SimpleStatementHandler extends BaseStatementHandler {
     }
   }
 
+  /*SimpleStatementHandler 不进行任何参数预处理，它的sql直接通过字符串拼接而成*/
   @Override
   public void parameterize(Statement statement) {
     // N/A

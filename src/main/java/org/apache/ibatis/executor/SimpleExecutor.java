@@ -53,13 +53,39 @@ public class SimpleExecutor extends BaseExecutor {
     }
   }
 
+  /**
+   * 数据库查询
+   * doQuery流程：
+   * 1.先创建StatementHandler语句处理器，StatementHandler是mybatis的四大组件之一，负责sql语句的执行。根据xml
+   * 配置文件的settings节点的statementType子元素，来创建不同的实现类，如SimpleStatementHandler，PreparedStatementHandler、
+   * CallableStatementHandler。它们的基类统一为BaseStatementHandler，外观类为RoutingStatementHandler
+   * 2.创建完StatementHandler后，调用prepareStatement进行初始化
+   * 3.然后调用实现类的query方法进行查询操作
+   *
+   *
+   * @param ms
+   * @param parameter
+   * @param rowBounds
+   * @param resultHandler
+   * @param boundSql
+   * @param <E>
+   * @return
+   * @throws SQLException
+   */
   @Override
   public <E> List<E> doQuery(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler, BoundSql boundSql) throws SQLException {
     Statement stmt = null;
     try {
       Configuration configuration = ms.getConfiguration();
+      /**
+       * 创建Statementhandler，用来执行sql语句，simpleExecutor创建的是RoutingStatementHandler
+       * 它的是一个门面类，几乎所有方法都是通过代理来实现。代理则由配置xml settings节点的StatementType区分。
+       * 故仅仅是一个分发和路由。
+       */
       StatementHandler handler = configuration.newStatementHandler(wrapper, ms, parameter, rowBounds, resultHandler, boundSql);
+      //构造Statement
       stmt = prepareStatement(handler, ms.getStatementLog());
+      //通过语句执行器的query方法进行查询，查询结果通过resultHandler处理后返回
       return handler.query(stmt, resultHandler);
     } finally {
       closeStatement(stmt);
@@ -81,10 +107,25 @@ public class SimpleExecutor extends BaseExecutor {
     return Collections.emptyList();
   }
 
+  /**
+   * 通过事务构造sql执行语句statement 如jdbcTransaction
+   * StatementHandler初始步骤如下：
+   * 1.先开启一个数据库连接
+   * 2.然后初始化StatementHandler
+   * 3.最后进行参数预处理
+   *
+   * @param handler
+   * @param statementLog
+   * @return
+   * @throws SQLException
+   */
   private Statement prepareStatement(StatementHandler handler, Log statementLog) throws SQLException {
     Statement stmt;
+    /*开启数据库连接，创建connection对象，JdbcTransaction事务直接通过jdbc创建connection*/
     Connection connection = getConnection(statementLog);
+    /*初始化statement并设置其相关变量，不同的statementHandler实现不同。后面以RoutingStatementHandler为案例分析*/
     stmt = handler.prepare(connection, transaction.getTimeout());
+    /*设置parameterHandler，对于simpleStatementHandler来说不用处理*/
     handler.parameterize(stmt);
     return stmt;
   }

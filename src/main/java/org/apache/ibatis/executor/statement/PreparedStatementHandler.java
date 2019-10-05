@@ -58,10 +58,14 @@ public class PreparedStatementHandler extends BaseStatementHandler {
     ps.addBatch();
   }
 
+  /*PreparedStatementHandler 的query操作过程*/
   @Override
   public <E> List<E> query(Statement statement, ResultHandler resultHandler) throws SQLException {
+    /*prepare方式下，sql statement进行了预编译，并注入了入参，它是一个prepareStatement类型*/
     PreparedStatement ps = (PreparedStatement) statement;
+    /*直接调用jdbc PrepareStatement的execute方法操作数据库*/
     ps.execute();
+    /*结果集处理*/
     return resultSetHandler.handleResultSets(ps);
   }
 
@@ -89,8 +93,10 @@ public class PreparedStatementHandler extends BaseStatementHandler {
     }
   }
 
+  /*PreparedStatementHandler 进行参数预处理，通过parameterHandler实现*/
   @Override
   public void parameterize(Statement statement) throws SQLException {
+    /*parameterHandler可以由用户通过插件方式实现，mybatis默认为DefaultParameterHandler*/
     parameterHandler.setParameters((PreparedStatement) statement);
   }
 

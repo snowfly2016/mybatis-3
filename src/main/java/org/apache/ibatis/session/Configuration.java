@@ -588,8 +588,21 @@ public class Configuration {
     return resultSetHandler;
   }
 
+  /**
+   * 创建RoutingStatementHandler，他是StatementHandler的外观类，也是StatementHandler的一个实现类
+   *
+   * @param executor
+   * @param mappedStatement
+   * @param parameterObject
+   * @param rowBounds
+   * @param resultHandler
+   * @param boundSql
+   * @return
+   */
   public StatementHandler newStatementHandler(Executor executor, MappedStatement mappedStatement, Object parameterObject, RowBounds rowBounds, ResultHandler resultHandler, BoundSql boundSql) {
+    /*直接构造一个RoutingStatementHandler*/
     StatementHandler statementHandler = new RoutingStatementHandler(executor, mappedStatement, parameterObject, rowBounds, resultHandler, boundSql);
+    /*将statementHandler添加为插件的目标执行器。插件通过配置xml文件的plugins节点设置*/
     statementHandler = (StatementHandler) interceptorChain.pluginAll(statementHandler);
     return statementHandler;
   }
@@ -598,10 +611,13 @@ public class Configuration {
     return newExecutor(transaction, defaultExecutorType);
   }
 
+  //创建sqlsession执行器Executor
   public Executor newExecutor(Transaction transaction, ExecutorType executorType) {
+    /*executorType通过settings节点中的defaultExecutorType 来设置，没有设置则默认为SIMPLE */
     executorType = executorType == null ? defaultExecutorType : executorType;
     executorType = executorType == null ? ExecutorType.SIMPLE : executorType;
     Executor executor;
+    /*根据ExecutorType分别创建BatchExecutor ReuseExecutor SimpleExecutor*/
     if (ExecutorType.BATCH == executorType) {
       executor = new BatchExecutor(this, transaction);
     } else if (ExecutorType.REUSE == executorType) {
@@ -609,9 +625,11 @@ public class Configuration {
     } else {
       executor = new SimpleExecutor(this, transaction);
     }
+    /*如果打开了缓存，使用CacheExecutor包装下之前的Executor，简单理解就是为Executor添加了cache功能*/
     if (cacheEnabled) {
       executor = new CachingExecutor(executor);
     }
+    /*将执行器executor设置到plugin节点中设置的所有插件中，作为插件的目标执行器*/
     executor = (Executor) interceptorChain.pluginAll(executor);
     return executor;
   }
@@ -771,10 +789,18 @@ public class Configuration {
     mapperRegistry.addMappers(packageName);
   }
 
+  /**
+   * configuration.addMapper()使用代理方式，调用到mapperRegistry中
+   * configuration包含了几乎所有的配置信息，是配置的门面，十分复杂
+   * 因此采用外观模式和代理模式，将真正实现下沉到各个子系统中。这样通过分层可以解耦和降低复杂度
+   * @param type
+   * @param <T>
+   */
   public <T> void addMapper(Class<T> type) {
     mapperRegistry.addMapper(type);
   }
 
+  /*mapper方式执行sql命令，先获取mapper对象*/
   public <T> T getMapper(Class<T> type, SqlSession sqlSession) {
     return mapperRegistry.getMapper(type, sqlSession);
   }

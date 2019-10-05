@@ -38,8 +38,10 @@ public class DefaultResultHandler implements ResultHandler<Object> {
     list = objectFactory.create(List.class);
   }
 
+  /*ResultHandler对映射后的结果做最后的处理*/
   @Override
   public void handleResult(ResultContext<?> context) {
+    /*DefaultResultHandler对经过resultMap映射后的JAVA结果不做任何处理，仅仅添加到list中，最后将list返回给selectList()等方法*/
     list.add(context.getResultObject());
   }
 

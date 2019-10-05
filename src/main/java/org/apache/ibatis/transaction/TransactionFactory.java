@@ -46,10 +46,12 @@ public interface TransactionFactory {
   Transaction newTransaction(Connection conn);
 
   /**
+   * 工厂类来创建事务实例
+   *
    * Creates a {@link Transaction} out of a datasource.
-   * @param dataSource DataSource to take the connection from
-   * @param level Desired isolation level
-   * @param autoCommit Desired autocommit
+   * @param dataSource DataSource to take the connection from 数据库源
+   * @param level Desired isolation level 事务隔离级别 定义并发事务的处理方式
+   * @param autoCommit Desired autocommit 是否自动提交
    * @return Transaction
    * @since 3.1.0
    */

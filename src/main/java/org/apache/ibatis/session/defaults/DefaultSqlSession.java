@@ -73,6 +73,7 @@ public class DefaultSqlSession implements SqlSession {
   @Override
   public <T> T selectOne(String statement, Object parameter) {
     // Popular vote was to return null on 0 results and throw exception on too many.
+    /*selectOne本质上是调用selectList实现，如果结果集大于一个，则报TooManyResultsException异常*/
     List<T> list = this.selectList(statement, parameter);
     if (list.size() == 1) {
       return list.get(0);
@@ -140,10 +141,25 @@ public class DefaultSqlSession implements SqlSession {
     return this.selectList(statement, parameter, RowBounds.DEFAULT);
   }
 
+  /**
+   * 有sql语句的标示statement和入参parameter，查询满足条件的数据列表
+   *
+   * @param statement Unique identifier matching the statement to use.
+   *                  mapper.xml中mapper节点下的select delete update insert等子节点的id属性
+   * @param parameter A parameter object to pass to the statement.
+   *                  传入sql语句的入参
+   * @param rowBounds  Bounds to limit object retrieval
+   *                   逻辑分页，包含offset limit 两个主要成员变量。
+   *                   mybatis分页逻辑为舍弃offset之前条目，取剩下的limit条，默认default不分页
+   * @param <E>
+   * @return
+   */
   @Override
   public <E> List<E> selectList(String statement, Object parameter, RowBounds rowBounds) {
     try {
+      /*从mapper节点初始化阶段创建好的mapperStatement这个map中，找到key为当前要找到的sql的id的那条*/
       MappedStatement ms = configuration.getMappedStatement(statement);
+      /*通过执行器Executor作为总调度来执行查询语句，后面以BaseExecutor来分析。BatchExecutor、ResultExecutor、SimpleExecutor均集成了BaseExecutor*/
       return executor.query(ms, wrapCollection(parameter), rowBounds, Executor.NO_RESULT_HANDLER);
     } catch (Exception e) {
       throw ExceptionFactory.wrapException("Error querying database.  Cause: " + e, e);
@@ -162,10 +178,20 @@ public class DefaultSqlSession implements SqlSession {
     select(statement, null, RowBounds.DEFAULT, handler);
   }
 
+  /**
+   * select方法通过executor实现，典型的代理模式
+   * selectOne selectList均调用它实现
+   *
+   * @param statement Unique identifier matching the statement to use.
+   * @param parameter
+   * @param rowBounds RowBound instance to limit the query results
+   * @param handler ResultHandler that will handle each retrieved row
+   */
   @Override
   public void select(String statement, Object parameter, RowBounds rowBounds, ResultHandler handler) {
     try {
       MappedStatement ms = configuration.getMappedStatement(statement);
+      //利用调度器executor代理实现
       executor.query(ms, wrapCollection(parameter), rowBounds, handler);
     } catch (Exception e) {
       throw ExceptionFactory.wrapException("Error querying database.  Cause: " + e, e);
@@ -189,11 +215,20 @@ public class DefaultSqlSession implements SqlSession {
     return update(statement, null);
   }
 
+  /**
+   * update 方法通过executor实现，典型的代理模式
+   * insert update等dml操作均调用它实现
+   *
+   * @param statement Unique identifier matching the statement to execute.
+   * @param parameter A parameter object to pass to the statement.
+   * @return
+   */
   @Override
   public int update(String statement, Object parameter) {
     try {
       dirty = true;
       MappedStatement ms = configuration.getMappedStatement(statement);
+      //利用调度器executor代理实现
       return executor.update(ms, wrapCollection(parameter));
     } catch (Exception e) {
       throw ExceptionFactory.wrapException("Error updating database.  Cause: " + e, e);
@@ -286,6 +321,7 @@ public class DefaultSqlSession implements SqlSession {
     return configuration;
   }
 
+  /*mapper动态代理方式执行sql命令的入口*/
   @Override
   public <T> T getMapper(Class<T> type) {
     return configuration.getMapper(type, this);
