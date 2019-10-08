@@ -12,6 +12,11 @@ import java.util.Map;
 
 public class MybatisTest {
 
+  /**
+   *
+   * @param args
+   * @throws Exception
+   */
   public static void main(String[] args) throws Exception {
     String resource = "mybatis.xml";
     InputStream inputStream = Resources.getResourceAsStream(resource);
@@ -32,7 +37,7 @@ public class MybatisTest {
     Map<String,Object> map = new HashMap<>();
     map.put("id","1");
     //因为一级缓存 这里不会调用两次SQL
-    System.out.println(mapper.selectAll("1", "1"));
+    System.out.println(mapper.selectAll("1", "19"));
     //如果有二级缓存 这里就不会调用两次SQL
     //当调用 sqlSession.close() 或者说刷新缓存方法， 或者说配置了定时清空缓存方法  都会销毁缓存
     sqlSession.close();

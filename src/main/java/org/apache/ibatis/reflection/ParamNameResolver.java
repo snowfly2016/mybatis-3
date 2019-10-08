@@ -54,6 +54,8 @@ public class ParamNameResolver {
     final Annotation[][] paramAnnotations = method.getParameterAnnotations();
     final SortedMap<Integer, String> map = new TreeMap<>();
     int paramCount = paramAnnotations.length;
+
+    /*优先从注解中获取参数*/
     // get names from @Param annotations
     for (int paramIndex = 0; paramIndex < paramCount; paramIndex++) {
       if (isSpecialParameter(paramTypes[paramIndex])) {
@@ -70,6 +72,10 @@ public class ParamNameResolver {
       }
       if (name == null) {
         // @Param was not specified.
+        /*jdk8以前调用会有问题 args0...解决方法就是编译的时候增加-parameters参数*/
+        //Spring MVC 底层调用的不是JDK的API  Spring MVC底层是去解析字节码
+        //在jdk8以前 调用这个getName 会有问题 arg0
+        //jdk8 调用jdk的api，
         if (config.isUseActualParamName()) {
           name = getActualParamName(method, paramIndex);
         }
@@ -114,6 +120,7 @@ public class ParamNameResolver {
     } else if (!hasParamAnnotation && paramCount == 1) {
       return args[names.firstKey()];
     } else {
+      /*多个参数 jdk8以前生成的参数是agrs0,agrs1...是jdk的bug*/
       final Map<String, Object> param = new ParamMap<>();
       int i = 0;
       for (Map.Entry<Integer, String> entry : names.entrySet()) {

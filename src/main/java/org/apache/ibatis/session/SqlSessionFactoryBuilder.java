@@ -60,6 +60,7 @@ public class SqlSessionFactoryBuilder {
     }
   }
 
+  /**/
   public SqlSessionFactory build(InputStream inputStream) {
     return build(inputStream, null, null);
   }

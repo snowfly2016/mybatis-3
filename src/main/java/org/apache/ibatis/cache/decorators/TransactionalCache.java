@@ -39,9 +39,14 @@ public class TransactionalCache implements Cache {
 
   private static final Log log = LogFactory.getLog(TransactionalCache.class);
 
+  /*缓存对象*/
   private final Cache delegate;
+  /*是否需要清空提交空间的标识*/
   private boolean clearOnCommit;
+  /*所有待提交的缓存*/
   private final Map<Object, Object> entriesToAddOnCommit;
+  //错误修改
+  //未命中的缓存集合，用于统计缓存命中率
   private final Set<Object> entriesMissedInCache;
 
   public TransactionalCache(Cache delegate) {
@@ -76,6 +81,8 @@ public class TransactionalCache implements Cache {
     }
   }
 
+  //本来应该put到缓存里面去
+  //put需要提交的空间里面去
   @Override
   public void putObject(Object key, Object object) {
     entriesToAddOnCommit.put(key, object);
@@ -113,9 +120,11 @@ public class TransactionalCache implements Cache {
 
   private void flushPendingEntries() {
     for (Map.Entry<Object, Object> entry : entriesToAddOnCommit.entrySet()) {
+      //put到真实缓存
       delegate.putObject(entry.getKey(), entry.getValue());
     }
     for (Object entry : entriesMissedInCache) {
+      //也会把未命中的一起put
       if (!entriesToAddOnCommit.containsKey(entry)) {
         delegate.putObject(entry, null);
       }
@@ -125,6 +134,7 @@ public class TransactionalCache implements Cache {
   private void unlockMissedEntries() {
     for (Object entry : entriesMissedInCache) {
       try {
+        //清空在真实缓存区里面的未命中的缓存
         delegate.removeObject(entry);
       } catch (Exception e) {
         log.warn("Unexpected exception while notifiying a rollback to the cache adapter."

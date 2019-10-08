@@ -90,6 +90,7 @@ public class XMLMapperBuilder extends BaseBuilder {
   }
 
   public void parse() {
+    /*loadedResources 不包含当前resource时，解析*/
     if (!configuration.isResourceLoaded(resource)) {
       configurationElement(parser.evalNode("/mapper"));
       configuration.addLoadedResource(resource);
@@ -105,6 +106,7 @@ public class XMLMapperBuilder extends BaseBuilder {
     return sqlFragments.get(refid);
   }
 
+  /*解析mapper文件里面的节点*/
   private void configurationElement(XNode context) {
     try {
       String namespace = context.getStringAttribute("namespace");

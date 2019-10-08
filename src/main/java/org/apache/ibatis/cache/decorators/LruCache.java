@@ -61,6 +61,7 @@ public class LruCache implements Cache {
     };
   }
 
+  /*回收的时机：putObject()方法调用的时候*/
   @Override
   public void putObject(Object key, Object value) {
     delegate.putObject(key, value);

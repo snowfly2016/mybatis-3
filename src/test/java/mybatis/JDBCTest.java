@@ -7,7 +7,14 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 
+/**
+ * 原生的JDBC
+ *
+ * jdbc方式执行SQL语句
+ */
 public class JDBCTest {
+
+  private final static String EXECUTE_SQL = "select * from user where id=?";
 
   static {
     try {
@@ -18,9 +25,9 @@ public class JDBCTest {
   }
 
   public static void main(String[] args) throws Exception {
-    System.out.println("test-----");
     Connection root = DriverManager.getConnection("jdbc:mysql://localhost:3306/test?characterEncoding=utf-8", "root", "zyk123456");
-    PreparedStatement preparedStatement = root.prepareStatement("select * from user where id=?");
+
+    PreparedStatement preparedStatement = root.prepareStatement(EXECUTE_SQL);
     preparedStatement.setString(1,"1");
     preparedStatement.execute();
     preparedStatement.getResultSet();
